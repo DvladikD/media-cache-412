@@ -9,3 +9,7 @@ https://shovo127.github.io/IPTV-By-Shovo/index.m3u
 https://raw.githubusercontent.com/Zaman-Topu/Ip-tv-Collection/main/FINAL_IPTV_ACTIVE.m3u
 
 # trigger Pages deploy
+
+# loganettv (RU/СНГ, 500+ каналов)
+https://loganettv.github.io/playlists/all.m3u
+https://loganettv.github.io/playlists/mega.m3u
