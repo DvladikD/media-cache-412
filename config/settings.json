@@ -1,0 +1,26 @@
+{
+  "sources_file": "config/sources.txt",
+  "epg_url": "https://iptvx.one/epg/epg_lite.xml.gz",
+  "github_user": "ЗАМЕНИТЕ_НА_СВОЙ_LOGIN",
+  "github_repo": "iptv-auto",
+  "base_url": "",
+  "refresh_hours": 6,
+  "countries": ["RU", "BY", "UA", "KZ", "AM", "AZ", "GE", "KG", "MD", "TJ", "TM", "UZ"],
+  "tvg_id_suffixes": [".ru@", ".by@", ".ua@", ".kz@", ".am@", ".az@", ".ge@", ".kg@", ".md@", ".tj@", ".tm@", ".uz@"],
+  "country_words": [
+    "Россия", "Russia", "Беларусь", "Belarus", "Украина", "Ukraine",
+    "Казахстан", "Kazakhstan", "Армения", "Armenia", "Азербайджан", "Azerbaijan",
+    "Грузия", "Georgia", "Кыргызстан", "Молдова", "Узбекистан", "СНГ"
+  ],
+  "exclude_words": ["xxx", "adult", "porn", "18+", "эротик", "секс", "камасутра"],
+  "priority_channels": [
+    "Первый канал", "НТВ", "Россия 1", "Россия 24", "Матч ТВ", "СТС",
+    "ТНТ", "Культура", "Пятый канал", "РЕН ТВ", "ТВ Центр", "Звезда",
+    "Спутник", "Мультиландия", "Карусель",
+    "NTV", "Channel One Russia", "Rossiya 1", "Russia 1", "CTC", "TNT", "Match TV"
+  ],
+  "parallel": 16,
+  "probe_timeout_seconds": 12,
+  "min_channels": 20,
+  "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+}

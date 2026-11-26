@@ -1,0 +1,9 @@
+# Публичные плейлисты-источники (одна ссылка на строку).
+# Сборщик сам скачивает их, дедуплицирует и проверяет потоки через ffprobe.
+# Чтобы добавить источник — просто допишите строку и закоммитьте.
+
+https://iptv-org.github.io/iptv/index.m3u
+https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8
+https://romaxa55.github.io/world_ip_tv/output/index.m3u
+https://shovo127.github.io/IPTV-By-Shovo/index.m3u
+https://raw.githubusercontent.com/Zaman-Topu/Ip-tv-Collection/main/FINAL_IPTV_ACTIVE.m3u
