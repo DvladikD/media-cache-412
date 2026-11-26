@@ -4,6 +4,7 @@ on:
   schedule:
     - cron: '17 */6 * * *'
   workflow_dispatch:
+  push:
 
 concurrency:
   group: iptv-playlist-update
