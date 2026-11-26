@@ -1,0 +1,65 @@
+name: Обновление IPTV-плейлиста
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: iptv-playlist-update
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: ffmpeg (для проверки потоков)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+
+      - name: Сборка плейлиста и EPG
+        env:
+          BASE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+          EPG_URL: https://iptvx.one/epg/epg_lite.xml.gz
+        run: python scripts/build.py
+
+      - name: Коммит отчёта (защита от отключения cron через 60 дней)
+        run: |
+          mkdir -p state
+          cp output/report.json state/last_run.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state/last_run.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: scheduled refresh [skip ci]"
+            git push
+          fi
+
+      - name: Загрузка артефакта Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: output
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Публикация на GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
