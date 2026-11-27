@@ -725,8 +725,8 @@ def check_streams(channels: list[Channel], settings: dict, no_probe: bool) -> No
 
 def write_playlist(streams: list[Channel], output_dir: Path, settings: dict, base_url: str) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    epg_sources = [f'{base_url.rstrip("/")}/epg.xml.gz']
-    epg_sources.extend(settings.get('extra_epg_urls', []))
+    epg_sources = list(settings.get('extra_epg_urls', []))
+    epg_sources.append(f'{base_url.rstrip("/")}/epg.xml.gz')
     epg_attr = ','.join(epg_sources)
     refresh = int(settings.get('refresh_hours', 6))
     unique_channels = len({stream.ch_number for stream in streams})
@@ -749,7 +749,9 @@ def write_playlist(streams: list[Channel], output_dir: Path, settings: dict, bas
         if channel.tvg_shift:
             attrs.append(f'tvg-shift="{channel.tvg_shift}"')
         attrs.append(f'tvg-name="{safe(name)}"')
-        if channel.logo:
+        if channel.logo and not (
+            channel.epg_id and settings.get('use_epg_logo_for_matched', False)
+        ):
             attrs.append(f'tvg-logo="{safe(channel.logo)}"')
         attrs.append(f'group-title="{safe(channel.category or "Прочее")}"')
         lines.append(f'#EXTINF:-1 {" ".join(attrs)},{name}')
@@ -883,6 +885,8 @@ def main() -> int:
             url_key = channel.url.strip()
             if not url_key or url_key in seen_urls:
                 continue
+            if not settings.get('include_shifted_channels', False) and channel.tvg_shift:
+                continue
             seen_urls.add(url_key)
             if in_focus(channel, settings) or is_priority(channel, priority_names):
                 channel.epg_id, channel.epg_score = match_epg(
@@ -990,6 +994,24 @@ def main() -> int:
             if inherited:
                 for stream in item['streams']:
                     stream.epg_id = inherited
+
+        merged: dict[str, dict] = {}
+        for item in prepared:
+            key = normalize(item['name'])
+            if key not in merged:
+                merged[key] = item
+                continue
+            known_urls = {stream.url for stream in merged[key]['streams']}
+            for stream in item['streams']:
+                if stream.url not in known_urls:
+                    known_urls.add(stream.url)
+                    merged[key]['streams'].append(stream)
+        prepared = list(merged.values())
+        for item in prepared:
+            name = name_overrides.get(normalize(item['name']), item['name'])
+            item['name'] = name
+            for stream in item['streams']:
+                stream.official_name = name
 
         category_order = settings.get('category_order', [])
 
