@@ -13,3 +13,8 @@ https://raw.githubusercontent.com/Zaman-Topu/Ip-tv-Collection/main/FINAL_IPTV_AC
 # loganettv (RU/СНГ, 500+ каналов)
 https://loganettv.github.io/playlists/all.m3u
 https://loganettv.github.io/playlists/mega.m3u
+
+# Дополнительные RU/CIS-источники
+https://ngrch.github.io/iptv/ru.m3u
+https://raw.githubusercontent.com/Dimonovich/TV/Dimonovich%2FFREE/.m3u
+https://DuckKota.github.io/iptv/playlists/country/ru.m3u
