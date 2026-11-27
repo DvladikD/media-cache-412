@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-11-27T18:58:47.234163+00:00",
-  "channels": 164,
-  "streams": 300,
-  "live_streams": 300,
+  "generated_at": "2026-11-27T19:41:20.953763+00:00",
+  "channels": 171,
+  "streams": 308,
+  "live_streams": 308,
   "backup_streams": 0,
   "tracked_streams": 1809,
-  "tracked_dead": 1127,
-  "with_epg": 60,
+  "tracked_dead": 1089,
+  "with_epg": 61,
   "categories": [
     "Детям",
     "Досуг",
