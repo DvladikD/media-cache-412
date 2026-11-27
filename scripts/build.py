@@ -914,7 +914,18 @@ def main() -> int:
         max_streams = int(settings.get('max_streams_per_channel', 3))
         prepared: list[dict] = []
         publish_dead = bool(settings.get('keep_dead_streams', False))
+        min_sources = int(settings.get('min_sources', 1))
         for norm_name, options in groups.items():
+            independent_sources = {
+                channel.source for channel in options if channel.source != 'state'
+            }
+            if (
+                min_sources > 1
+                and len(independent_sources) < min_sources
+                and not any(channel.forced for channel in options)
+                and not is_priority(options[0], priority_names)
+            ):
+                continue
             candidates = [channel for channel in options if channel.score >= 0]
             if not candidates:
                 # Канал без живого потока в плейлист не попадает,

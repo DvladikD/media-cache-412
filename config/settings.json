@@ -38,6 +38,7 @@
   "max_segment_age_minutes": 120,
   "min_channels": 20,
   "max_streams_per_channel": 4,
+  "min_sources": 2,
   "keep_dead_streams": false,
   "state_file": "state/known_streams.json",
   "state_max_age_days": 14,
