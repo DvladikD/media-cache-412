@@ -5,8 +5,10 @@
   1. скачивает публичные M3U-источники из config/sources.txt;
   2. оставляет каналы России/СНГ (или каналы с совпавшим EPG);
   3. автоматически сопоставляет каналы с XMLTV (iptvx.one) по tvg-id/имени;
-  4. проверяет потоки через ffprobe и оставляет лучший рабочий stream на канал;
-  5. публикует playlist.m3u и урезанный epg.xml.gz в output/.
+  4. проверяет потоки через ffprobe и оставляет до N рабочих потоков на канал
+     (OTT Navigator при включённом folding сам переключится на следующий);
+  5. сортирует каналы по категориям и даёт им официальные имена;
+  6. публикует playlist.m3u и урезанный epg.xml.gz в output/.
 
 Запуск в GitHub Actions: python scripts/build.py
 Локальная проверка без ffprobe: python scripts/build.py --no-probe --epg-file <путь к epg.xml.gz>
@@ -15,8 +17,10 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import difflib
 import gzip
+import io
 import json
 import os
 import re
@@ -61,6 +65,110 @@ def normalize(value: str) -> str:
     return text
 
 
+def clean_official(value: str) -> str:
+    """Читаемое имя канала без quality-суффиксов, геотегов и таймшифтов."""
+    text = (value or '').strip()
+    text = MARK_RE.sub(' ', text)
+    text = BRACKET_RE.sub(' ', text)
+    text = QUALITY_RE.sub(' ', text)
+    text = SPACE_RE.sub(' ', text).strip(' -–—')
+    return text
+
+
+def pick_display_name(raw_names: list[str], source_name: str) -> str:
+    """Выбирает лучший display-name из XMLTV для данного канала."""
+    cleaned = [clean_official(name) for name in raw_names]
+    cleaned = [name for name in cleaned if name]
+    if not cleaned:
+        return clean_official(source_name)
+
+    counts: dict[str, int] = {}
+    for name in cleaned:
+        counts[name] = counts.get(name, 0) + 1
+    source_norm = normalize(source_name)
+    best = max(
+        cleaned,
+        key=lambda name: (
+            counts[name],
+            difflib.SequenceMatcher(None, normalize(name), source_norm).ratio(),
+            -len(name),
+        ),
+    )
+    return best
+
+
+def load_canonical_names(settings: dict) -> dict[str, str]:
+    """site_id iptvx.one → чистое русское имя из iptv-org/epg."""
+    url = settings.get(
+        'canonical_names_url',
+        'https://raw.githubusercontent.com/iptv-org/epg/master/'
+        'sites/epg.iptvx.one/epg.iptvx.one.channels.xml',
+    )
+    try:
+        root = ET.fromstring(fetch_text(url, timeout=60))
+    except Exception as error:
+        log(f'Не удалось загрузить справочник имён: {error}')
+        return {}
+    names: dict[str, str] = {}
+    for element in root.iter('channel'):
+        site_id = (element.get('site_id') or '').strip()
+        name = clean_official(element.text or '')
+        if site_id and name:
+            names[site_id] = name
+    log(f'Справочник официальных имён: {len(names)} записей')
+    return names
+
+
+def load_database_names(settings: dict) -> dict[str, str]:
+    """ID iptv-org (ChannelOne.ru) → русское имя из alt_names."""
+    url = settings.get(
+        'channels_csv_url',
+        'https://raw.githubusercontent.com/iptv-org/database/master/data/channels.csv',
+    )
+    try:
+        raw = fetch_text(url, timeout=120)
+    except Exception as error:
+        log(f'Не удалось загрузить channels.csv: {error}')
+        return {}
+    names: dict[str, str] = {}
+    for row in csv.DictReader(io.StringIO(raw)):
+        channel_id = (row.get('id') or '').strip()
+        if not channel_id:
+            continue
+        alternatives = [part.strip() for part in (row.get('alt_names') or '').split(';')]
+        russian = [
+            part for part in alternatives
+            if any('\u0400' <= char <= '\u04ff' for char in part)
+        ]
+        name = clean_official(russian[0] if russian else row.get('name', ''))
+        if name:
+            names[channel_id.lower()] = name
+    log(f'Справочник имён iptv-org/database: {len(names)} записей')
+    return names
+
+
+def assign_category(channel: Channel, settings: dict) -> str:
+    country_categories = settings.get('country_categories', {})
+    country = channel.country.strip().upper()
+    if country in country_categories:
+        return country_categories[country]
+
+    primary = channel.group.split(';')[0].strip()
+    normalized = normalize(primary)
+    mapping = settings.get('category_map', {})
+    for key, value in mapping.items():
+        if normalize(key) == normalized:
+            return value
+    for key, value in mapping.items():
+        if normalize(key) and normalize(key) in normalized:
+            return value
+    tvg_id = channel.tvg_id.lower()
+    for suffix, category in settings.get('tvg_id_category_suffixes', {}).items():
+        if suffix.lower() in tvg_id:
+            return category
+    return settings.get('default_category', 'Прочее')
+
+
 @dataclass
 class Channel:
     name: str
@@ -77,6 +185,9 @@ class Channel:
     epg_id: str = ''
     epg_score: float = 0.0
     score: int = -1
+    official_name: str = ''
+    category: str = ''
+    ch_number: int = 0
     attrs: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -147,9 +258,12 @@ def parse_m3u(text: str, source: str) -> list[Channel]:
     return channels
 
 
-def load_epg_channels(epg_path: Path) -> tuple[dict[str, list[str]], dict[str, str], dict[str, str]]:
+def load_epg_channels(
+    epg_path: Path,
+) -> tuple[dict[str, list[str]], dict[str, list[str]], dict[str, str], dict[str, str]]:
     """Читает только блок <channel> в начале XMLTV (до первого <programme>)."""
     by_id: dict[str, list[str]] = {}
+    raw_by_id: dict[str, list[str]] = {}
     xml_by_id: dict[str, str] = {}
     tv_attrs: dict[str, str] = {}
 
@@ -164,16 +278,20 @@ def load_epg_channels(epg_path: Path) -> tuple[dict[str, list[str]], dict[str, s
                 channel_id = element.get('id', '')
                 if channel_id:
                     names = []
+                    raw_names = []
                     for node in element.findall('display-name'):
-                        normalized = normalize(node.text or '')
+                        raw = (node.text or '').strip()
+                        normalized = normalize(raw)
                         if normalized:
                             names.append(normalized)
+                            raw_names.append(raw)
                     by_id[channel_id] = names
+                    raw_by_id[channel_id] = raw_names
                     xml_by_id[channel_id] = ET.tostring(element, encoding='unicode')
                 element.clear()
 
     log(f'EPG: прочитано {len(by_id)} каналов')
-    return by_id, xml_by_id, tv_attrs
+    return by_id, raw_by_id, xml_by_id, tv_attrs
 
 
 def build_name_index(by_id: dict[str, list[str]]) -> tuple[dict[str, list[str]], list[str]]:
@@ -321,31 +439,37 @@ def check_streams(channels: list[Channel], settings: dict, no_probe: bool) -> No
     log(f'Живых потоков: {alive} из {len(channels)}')
 
 
-def write_playlist(channels: list[Channel], output_dir: Path, settings: dict, base_url: str) -> None:
+def write_playlist(streams: list[Channel], output_dir: Path, settings: dict, base_url: str) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     epg_url = f'{base_url.rstrip("/")}/epg.xml.gz'
     refresh = int(settings.get('refresh_hours', 6))
+    unique_channels = len({stream.ch_number for stream in streams})
     lines = [
         f'#EXTM3U url-tvg="{epg_url}" refresh="{refresh}"',
-        f'# Generated {datetime.now(timezone.utc).isoformat()} — {len(channels)} channels',
+        f'# Generated {datetime.now(timezone.utc).isoformat()} — '
+        f'{unique_channels} channels / {len(streams)} streams',
     ]
+
     def safe(value: str) -> str:
         return value.replace('"', "'")
 
-    for number, channel in enumerate(channels, start=1):
-        attrs = [f'ch-number="{number}"']
+    for channel in streams:
+        name = channel.official_name or clean_official(channel.name)
+        attrs = [f'ch-number="{channel.ch_number}"']
         if channel.epg_id:
             attrs.append(f'tvg-id="{safe(channel.epg_id)}"')
-        attrs.append(f'tvg-name="{safe(channel.name)}"')
+        attrs.append(f'tvg-name="{safe(name)}"')
         if channel.logo:
             attrs.append(f'tvg-logo="{safe(channel.logo)}"')
-        attrs.append(f'group-title="{safe(channel.group or "Россия и СНГ")}"')
-        lines.append(f'#EXTINF:-1 {" ".join(attrs)},{channel.name}')
+        attrs.append(f'group-title="{safe(channel.category or "Прочее")}"')
+        lines.append(f'#EXTINF:-1 {" ".join(attrs)},{name}')
         if channel.user_agent:
             lines.append(f'#EXTVLCOPT:http-user-agent={channel.user_agent}')
+        if channel.referrer:
+            lines.append(f'#EXTVLCOPT:http-referrer={channel.referrer}')
         lines.append(channel.url)
     (output_dir / 'playlist.m3u').write_text('\n'.join(lines) + '\n', encoding='utf-8')
-    log(f'Плейлист записан: {len(channels)} каналов')
+    log(f'Плейлист записан: {unique_channels} каналов, {len(streams)} потоков')
 
 
 def write_epg(
@@ -393,10 +517,13 @@ def main() -> int:
         nullcontext(args.epg_file.resolve()) if args.epg_file else _download_epg(settings)
     )
     with epg_context as epg_path:
-        by_id, xml_by_id, tv_attrs = load_epg_channels(epg_path)
+        by_id, raw_by_id, xml_by_id, tv_attrs = load_epg_channels(epg_path)
         name_to_ids, _name_keys = build_name_index(by_id)
         token_index = build_token_index(name_to_ids)
         priority_names = {normalize(name) for name in settings.get('priority_channels', [])}
+        canonical_names = load_canonical_names(settings)
+        database_names = load_database_names(settings)
+        name_overrides = settings.get('name_overrides', {})
 
         channels: list[Channel] = []
         for line in source_file.read_text(encoding='utf-8').splitlines():
@@ -412,14 +539,14 @@ def main() -> int:
 
         kept: list[Channel] = []
         reserve: list[Channel] = []
-        seen: set[str] = set()
+        seen_urls: set[str] = set()
         for channel in channels:
             if is_blocked(channel, settings):
                 continue
-            key = channel.norm_name or normalize(channel.url)
-            if not key or key in seen:
+            url_key = channel.url.strip()
+            if not url_key or url_key in seen_urls:
                 continue
-            seen.add(key)
+            seen_urls.add(url_key)
             if in_focus(channel, settings) or is_priority(channel, priority_names):
                 channel.epg_id, channel.epg_score = match_epg(
                     channel, by_id, name_to_ids, token_index
@@ -437,14 +564,15 @@ def main() -> int:
                     channel.epg_id, channel.epg_score = epg_id, epg_score
                     kept.append(channel)
 
-        log(f'После фильтрации: {len(kept)} уникальных каналов')
+        log(f'После фильтрации: {len(kept)} потоков')
         check_streams(kept, settings, args.no_probe)
 
         groups: dict[str, list[Channel]] = {}
         for channel in kept:
             groups.setdefault(channel.norm_name, []).append(channel)
-        final: list[Channel] = []
-        for options in groups.values():
+        max_streams = int(settings.get('max_streams_per_channel', 3))
+        prepared: list[dict] = []
+        for norm_name, options in groups.items():
             working = [channel for channel in options if channel.score >= 0]
             if not working:
                 continue
@@ -457,20 +585,61 @@ def main() -> int:
                 ),
                 reverse=True,
             )
-            final.append(working[0])
-        final.sort(key=lambda channel: channel.name.lower())
+            working = working[:max_streams]
+            best = working[0]
+            base_id = best.tvg_id.split('@')[0].lower()
+            official = (
+                name_overrides.get(norm_name)
+                or canonical_names.get(best.epg_id)
+                or database_names.get(base_id)
+                or (
+                    pick_display_name(raw_by_id.get(best.epg_id, []), best.name)
+                    if best.epg_id
+                    else clean_official(best.name)
+                )
+            )
+            category = assign_category(best, settings)
+            for stream in working:
+                stream.official_name = official
+                stream.category = category
+            prepared.append({'name': official, 'category': category, 'streams': working})
 
-        if len(final) < minimum:
-            log(f'ОШИБКА: живых каналов {len(final)} < минимума {minimum}; публикация отменена')
+        category_order = settings.get('category_order', [])
+
+        def order_key(item: dict) -> tuple[int, str]:
+            category = item['category']
+            try:
+                position = category_order.index(category)
+            except ValueError:
+                position = len(category_order)
+            return position, item['name'].lower()
+
+        prepared.sort(key=order_key)
+        final_streams: list[Channel] = []
+        for number, item in enumerate(prepared, start=1):
+            for stream in item['streams']:
+                stream.ch_number = number
+                final_streams.append(stream)
+
+        if len(prepared) < minimum:
+            log(f'ОШИБКА: живых каналов {len(prepared)} < минимума {minimum}; публикация отменена')
             return 2
 
-        write_playlist(final, args.output_dir, settings, base_url)
-        write_epg(epg_path, args.output_dir, {c.epg_id for c in final if c.epg_id}, xml_by_id, tv_attrs)
+        write_playlist(final_streams, args.output_dir, settings, base_url)
+        write_epg(
+            epg_path,
+            args.output_dir,
+            {c.epg_id for c in final_streams if c.epg_id},
+            xml_by_id,
+            tv_attrs,
+        )
 
         report = {
             'generated_at': datetime.now(timezone.utc).isoformat(),
-            'channels': len(final),
-            'with_epg': sum(1 for channel in final if channel.epg_id),
+            'channels': len(prepared),
+            'streams': len(final_streams),
+            'with_epg': sum(1 for item in prepared if item['streams'][0].epg_id),
+            'categories': sorted({item['category'] for item in prepared}),
             'sources': len([line for line in source_file.read_text(encoding='utf-8').splitlines()
                             if line.strip() and not line.startswith('#')]),
             'base_url': base_url,
@@ -478,7 +647,8 @@ def main() -> int:
         (args.output_dir / 'report.json').write_text(
             json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8'
         )
-        log(f'Готово: {report["channels"]} каналов, {report["with_epg"]} с EPG')
+        log(f'Готово: {report["channels"]} каналов, {report["streams"]} потоков, '
+            f'{report["with_epg"]} с EPG')
     return 0
 
 

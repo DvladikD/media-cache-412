@@ -30,6 +30,13 @@
 
 Готово. Дальше вмешательство не требуется: workflow ходит по cron, коммитит `state/last_run.json` (это защищает расписание от отключения после 60 дней неактивности) и перевыкладывает плейлист.
 
+## Резервные потоки, категории и имена
+
+- **Несколько потоков на канал:** сборщик оставляет до `max_streams_per_channel` рабочих URL с одинаковым именем, категорией и номером. В OTT Navigator включите:
+  `Settings → Provider data → Channel processing → Duplicate channels → Fold duplicate channels to a single element` (**Premium**), режим объединения — `by name within one category`. После этого плеер при ошибке сам перейдёт к следующему источнику; ручной выбор — `Switch to another media source` в меню канала.
+- **Порядок:** категории задаются `group-title` и выставляются в `category_order` в `config/settings.json`; каналы нумеруются `ch-number`. В плеере выберите сортировку `order from provider playlist`, чтобы сохранить наш порядок.
+- **Названия:** берутся из справочника `iptv-org/epg` (чистые русские имена) и `iptv-org/database` (`alt_names`); точечные правки — в `name_overrides` в `config/settings.json`.
+
 ## Что можно менять без риска сломать автообновление
 
 - `config/sources.txt` — добавлять/удалять публичные источники.
@@ -65,3 +72,7 @@ python scripts/build.py --no-probe --epg-file E:\tmp\epg.xml.gz
 - Репозиторий содержит только публичные ссылки, без токенов и логинов.
 - Использование публичных потоков может регулироваться правообладателями: смотрите только каналы, доступные для свободного просмотра в вашем регионе.
 - GitHub может задерживать cron в часы пика; интервал `refresh` в плеере согласован с публикацией (6 часов) — это нормально.
+
+## Проверка
+
+Плейлист: `https://DvladikD.github.io/iptv-auto/playlist.m3u`, EPG: `https://DvladikD.github.io/iptv-auto/epg.xml.gz`.
