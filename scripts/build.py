@@ -283,6 +283,11 @@ def parse_m3u(text: str, source: str) -> list[Channel]:
             attrs = {key: unquote(value) for key, value in attrs.items()}
             shift_match = SHIFT_RE.search(name)
             tvg_shift = int(shift_match.group(1)) if shift_match else 0
+            if not tvg_shift:
+                id_shift = re.search(r'-(pl|m)(\d{1,2})$', attrs.get('tvg-id', '').lower())
+                if id_shift:
+                    value = int(id_shift.group(2))
+                    tvg_shift = value if id_shift.group(1) == 'pl' else -value
             if not -12 <= tvg_shift <= 12:
                 tvg_shift = 0
             user_agent = attrs.get('http-user-agent', '')
