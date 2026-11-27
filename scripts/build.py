@@ -29,7 +29,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import nullcontext
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import unquote, urljoin
 from urllib.request import Request, urlopen
@@ -252,6 +252,76 @@ class Channel:
 def read_settings(path: Path) -> dict:
     with path.open('r', encoding='utf-8') as handle:
         return json.load(handle)
+
+
+def channel_to_state(channel: Channel) -> dict:
+    return {
+        'name': channel.name,
+        'tvg_name': channel.tvg_name,
+        'tvg_id': channel.tvg_id,
+        'logo': channel.logo,
+        'group': channel.group,
+        'country': channel.country,
+        'url': channel.url,
+        'user_agent': channel.user_agent,
+        'referrer': channel.referrer,
+        'source': channel.source,
+        'tvg_shift': channel.tvg_shift,
+        'epg_id': channel.epg_id,
+        'epg_score': channel.epg_score,
+        'score': channel.score,
+        'alive': channel.score >= 0,
+        'last_seen': datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def load_known_streams(path: Path, max_age_days: int) -> list[Channel]:
+    if not path.exists():
+        return []
+    try:
+        payload = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, json.JSONDecodeError) as error:
+        log(f'Не удалось прочитать состояние потоков: {error}')
+        return []
+    cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+    restored: list[Channel] = []
+    for item in payload:
+        try:
+            seen = datetime.fromisoformat(item['last_seen'])
+        except (KeyError, ValueError):
+            continue
+        if seen < cutoff:
+            continue
+        restored.append(
+            Channel(
+                name=item.get('name', ''),
+                tvg_name=item.get('tvg_name', item.get('name', '')),
+                tvg_id=item.get('tvg_id', ''),
+                logo=item.get('logo', ''),
+                group=item.get('group', ''),
+                country=item.get('country', ''),
+                url=item.get('url', ''),
+                user_agent=item.get('user_agent', ''),
+                referrer=item.get('referrer', ''),
+                source='state',
+                tvg_shift=int(item.get('tvg_shift', 0) or 0),
+                epg_id=item.get('epg_id', ''),
+                epg_score=float(item.get('epg_score', 0) or 0),
+                score=int(item.get('score', -1)),
+            )
+        )
+    log(f'Из состояния восстановлено потоков: {len(restored)}')
+    return restored
+
+
+def save_known_streams(path: Path, channels: list[Channel]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    state = [channel_to_state(channel) for channel in channels]
+    path.write_text(
+        json.dumps(state, ensure_ascii=False, indent=1) + '\n', encoding='utf-8'
+    )
+    log(f'Состояние сохранено: {len(state)} потоков '
+        f'({sum(1 for item in state if item["alive"])} живых)')
 
 
 def fetch_text(url: str, timeout: int = 90) -> str:
@@ -625,7 +695,9 @@ def write_status(prepared: list[dict], output_dir: Path, report: dict) -> None:
         f"Каналов всего: {report['channels']}",
         f"Потоков всего: {report['streams']}",
         f"Рабочих потоков: {report['live_streams']}",
-        f"Резервных потоков: {report['backup_streams']}",
+        f"Резервных потоков в плейлисте: {report['backup_streams']}",
+        f"Отслеживается потоков всего: {report['tracked_streams']}",
+        f"Из них сейчас нерабочих: {report['tracked_dead']}",
         f"Каналов без рабочего потока: {len(dead)}",
         '',
     ]
@@ -708,6 +780,14 @@ def main() -> int:
             except Exception as error:  # источник может временно лежать
                 log(f'Источник {url} недоступен: {error}')
 
+        state_path = ROOT / settings.get('state_file', 'state/known_streams.json')
+        channels.extend(
+            load_known_streams(
+                state_path,
+                int(settings.get('state_max_age_days', 14)),
+            )
+        )
+
         kept: list[Channel] = []
         reserve: list[Channel] = []
         seen_urls: set[str] = set()
@@ -739,6 +819,7 @@ def main() -> int:
 
         log(f'После фильтрации: {len(kept)} потоков')
         check_streams(kept, settings, args.no_probe)
+        save_known_streams(state_path, kept)
 
         groups: dict[str, list[Channel]] = {}
         for channel in kept:
@@ -748,16 +829,16 @@ def main() -> int:
             groups.setdefault(group_key, []).append(channel)
         max_streams = int(settings.get('max_streams_per_channel', 3))
         prepared: list[dict] = []
-        keep_dead = bool(settings.get('keep_dead_streams', True))
+        publish_dead = bool(settings.get('keep_dead_streams', False))
         for norm_name, options in groups.items():
             candidates = [channel for channel in options if channel.score >= 0]
             if not candidates:
-                if not keep_dead:
+                # Канал без живого потока в плейлист не попадает,
+                # но все его URL остаются в state и проверяются в следующих запусках.
+                if not publish_dead:
                     continue
                 candidates = list(options)
-            elif keep_dead:
-                # Мёртвые в данный момент URL остаются резервными источниками:
-                # OTT Navigator сам переключится на них, если те заработают.
+            elif publish_dead:
                 candidates.extend(channel for channel in options if channel.score < 0)
             candidates.sort(
                 key=lambda item: (
@@ -831,6 +912,8 @@ def main() -> int:
             'streams': len(final_streams),
             'live_streams': sum(1 for channel in final_streams if channel.score >= 0),
             'backup_streams': sum(1 for channel in final_streams if channel.score < 0),
+            'tracked_streams': len(kept),
+            'tracked_dead': sum(1 for channel in kept if channel.score < 0),
             'with_epg': sum(1 for item in prepared if item['streams'][0].epg_id),
             'categories': sorted({item['category'] for item in prepared}),
             'sources': len([line for line in source_file.read_text(encoding='utf-8').splitlines()

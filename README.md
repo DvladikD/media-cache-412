@@ -34,7 +34,7 @@
 
 ## Резервные потоки, категории и имена
 
-- **Несколько потоков на канал:** сборщик оставляет до `max_streams_per_channel` URL с одинаковым именем, категорией и номером. Потоки, которые сейчас не отвечают (`keep_dead_streams`), не удаляются, а идут следом как резерв — если ссылка оживёт, плеер переключится на неё автоматически. В OTT Navigator включите:
+- **Несколько потоков на канал:** сборщик оставляет до `max_streams_per_channel` рабочих URL с одинаковым именем, категорией и номером. Нерабочие потоки в плейлист **не попадают**, но сохраняются в `state/known_streams.json` и проверяются при каждом запуске; если ссылка оживёт, канал вернётся автоматически. В OTT Navigator включите:
   `Settings → Provider data → Channel processing → Duplicate channels → Fold duplicate channels to a single element` (**Premium**), режим объединения — `by name within one category`. После этого плеер при ошибке сам перейдёт к следующему источнику; ручной выбор — `Switch to another media source` в меню канала.
 - **Порядок:** категории задаются `group-title` и выставляются в `category_order` в `config/settings.json`; каналы нумеруются `ch-number`. В плеере выберите сортировку `order from provider playlist`, чтобы сохранить наш порядок.
 - **Названия:** берутся из справочника `iptv-org/epg` (чистые русские имена) и `iptv-org/database` (`alt_names`); точечные правки — в `name_overrides` в `config/settings.json`.

@@ -29,7 +29,9 @@
   "max_segment_age_minutes": 120,
   "min_channels": 20,
   "max_streams_per_channel": 4,
-  "keep_dead_streams": true,
+  "keep_dead_streams": false,
+  "state_file": "state/known_streams.json",
+  "state_max_age_days": 14,
   "canonical_names_url": "https://raw.githubusercontent.com/iptv-org/epg/master/sites/epg.iptvx.one/epg.iptvx.one.channels.xml",
   "channels_csv_url": "https://raw.githubusercontent.com/iptv-org/database/master/data/channels.csv",
   "tvg_id_category_suffixes": {
