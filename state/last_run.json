@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-11-27T19:41:20.953763+00:00",
-  "channels": 171,
-  "streams": 308,
-  "live_streams": 308,
+  "generated_at": "2026-11-27T20:38:43.541097+00:00",
+  "channels": 166,
+  "streams": 307,
+  "live_streams": 307,
   "backup_streams": 0,
-  "tracked_streams": 1809,
-  "tracked_dead": 1089,
-  "with_epg": 61,
+  "tracked_streams": 1901,
+  "tracked_dead": 1139,
+  "with_epg": 60,
   "categories": [
     "Детям",
     "Досуг",
@@ -17,10 +17,11 @@
     "Познавательное",
     "Прочее",
     "Развлечения",
+    "Религия",
     "Россия",
     "СНГ",
     "Спорт"
   ],
-  "sources": 22,
+  "sources": 31,
   "base_url": "https://DvladikD.github.io/media-cache-412/"
 }
