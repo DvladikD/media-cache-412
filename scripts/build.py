@@ -207,7 +207,12 @@ def assign_category(channel: Channel, settings: dict) -> str:
     country = channel.country.strip().upper()
     tvg_id = (channel.tvg_id or '').lower()
     epg_id = (channel.epg_id or '').lower()
-    is_russian = country == 'RU' or '.ru@' in tvg_id or '.ru@' in epg_id
+    is_russian = (
+        country == 'RU'
+        or '.ru@' in tvg_id
+        or '.ru@' in epg_id
+        or any(keyword in name for keyword in settings.get('russian_name_keywords', []))
+    )
     is_cis = (
         (country in settings.get('country_categories', {}) and country != 'RU')
         or any(keyword in name for keyword in settings.get('cng_name_keywords', []))

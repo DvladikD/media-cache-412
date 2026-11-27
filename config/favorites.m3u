@@ -11,5 +11,7 @@ http://31.148.48.15/Russkiy_Detektiv/index.m3u8
 http://stream.mcquack.net/204/index.m3u8
 #EXTINF:-1 group-title="Кино" tvg-id="russky-detektiv" tvg-name="Русский детектив",Русский детектив
 http://ott.watch/stream/6HAPZWKKG3/204.m3u8
+#EXTINF:-1 group-title="Детям" tvg-id="kernel-chipndale" tvg-name="Чип и Дейл",Чип и Дейл
+http://194.26.229.213/chip-n-dale-rescue-rangers/index.m3u8
 #EXTINF:-1 group-title="Кино" tvg-id="CityEdenKinoDetektiv.ru@HD" tvg-name="Сити Эдем КиноДетектив" tvg-logo="https://i.imgur.com/9rKHwBV.png",Сити Эдем КиноДетектив
 https://cityeden.catcast.tv/content/41327/index.m3u8
