@@ -636,12 +636,20 @@ def main() -> int:
             groups.setdefault(group_key, []).append(channel)
         max_streams = int(settings.get('max_streams_per_channel', 3))
         prepared: list[dict] = []
+        keep_dead = bool(settings.get('keep_dead_streams', True))
         for norm_name, options in groups.items():
-            working = [channel for channel in options if channel.score >= 0]
-            if not working:
-                continue
-            working.sort(
+            candidates = [channel for channel in options if channel.score >= 0]
+            if not candidates:
+                if not keep_dead:
+                    continue
+                candidates = list(options)
+            elif keep_dead:
+                # Мёртвые в данный момент URL остаются резервными источниками:
+                # OTT Navigator сам переключится на них, если те заработают.
+                candidates.extend(channel for channel in options if channel.score < 0)
+            candidates.sort(
                 key=lambda item: (
+                    item.score >= 0,
                     item.score,
                     is_priority(item, priority_names),
                     item.epg_score,
@@ -649,7 +657,7 @@ def main() -> int:
                 ),
                 reverse=True,
             )
-            working = working[:max_streams]
+            working = candidates[:max_streams]
             best = working[0]
             base_id = best.tvg_id.split('@')[0].lower()
             official = (
@@ -709,6 +717,8 @@ def main() -> int:
             'generated_at': datetime.now(timezone.utc).isoformat(),
             'channels': len(prepared),
             'streams': len(final_streams),
+            'live_streams': sum(1 for channel in final_streams if channel.score >= 0),
+            'backup_streams': sum(1 for channel in final_streams if channel.score < 0),
             'with_epg': sum(1 for item in prepared if item['streams'][0].epg_id),
             'categories': sorted({item['category'] for item in prepared}),
             'sources': len([line for line in source_file.read_text(encoding='utf-8').splitlines()

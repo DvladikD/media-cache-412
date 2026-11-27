@@ -22,7 +22,8 @@
   "parallel": 24,
   "probe_timeout_seconds": 10,
   "min_channels": 20,
-  "max_streams_per_channel": 3,
+  "max_streams_per_channel": 4,
+  "keep_dead_streams": true,
   "canonical_names_url": "https://raw.githubusercontent.com/iptv-org/epg/master/sites/epg.iptvx.one/epg.iptvx.one.channels.xml",
   "channels_csv_url": "https://raw.githubusercontent.com/iptv-org/database/master/data/channels.csv",
   "tvg_id_category_suffixes": {
