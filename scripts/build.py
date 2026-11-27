@@ -202,24 +202,46 @@ def assign_category(channel: Channel, settings: dict) -> str:
     name = normalize(channel.name)
     if any(keyword in name for keyword in settings.get('dnr_keywords', [])):
         return settings.get('dnr_category', 'ДНР')
-    country_categories = settings.get('country_categories', {})
+
+    cng_category = settings.get('cng_category', 'СНГ')
     country = channel.country.strip().upper()
-    if country in country_categories:
-        return country_categories[country]
+    tvg_id = (channel.tvg_id or '').lower()
+    epg_id = (channel.epg_id or '').lower()
+    is_russian = country == 'RU' or '.ru@' in tvg_id or '.ru@' in epg_id
+    is_cis = (
+        (country in settings.get('country_categories', {}) and country != 'RU')
+        or any(keyword in name for keyword in settings.get('cng_name_keywords', []))
+        or any(suffix in tvg_id for suffix in settings.get('cng_id_suffixes', []))
+        or any(suffix in epg_id for suffix in settings.get('cng_id_suffixes', []))
+    )
+    if is_cis:
+        return cng_category
 
     primary = channel.group.split(';')[0].strip()
     normalized = normalize(primary)
     mapping = settings.get('category_map', {})
+    mapped = ''
     for key, value in mapping.items():
         if normalize(key) == normalized:
-            return value
-    for key, value in mapping.items():
-        if normalize(key) and normalize(key) in normalized:
-            return value
-    tvg_id = channel.tvg_id.lower()
-    for suffix, category in settings.get('tvg_id_category_suffixes', {}).items():
-        if suffix.lower() in tvg_id:
-            return category
+            mapped = value
+            break
+    if not mapped:
+        for key, value in mapping.items():
+            if normalize(key) and normalize(key) in normalized:
+                mapped = value
+                break
+
+    if is_russian:
+        if mapped in settings.get('topic_categories', []):
+            return mapped
+        for topic, keywords in settings.get('topic_name_keywords', {}).items():
+            if any(keyword in name for keyword in keywords):
+                return topic
+        return settings.get('russian_category', 'Россия')
+    if mapped:
+        return mapped
+    if '.ru@' in tvg_id or '.ru@' in epg_id:
+        return settings.get('russian_category', 'Россия')
     return settings.get('default_category', 'Прочее')
 
 
@@ -1012,6 +1034,10 @@ def main() -> int:
             item['name'] = name
             for stream in item['streams']:
                 stream.official_name = name
+            category = assign_category(item['streams'][0], settings)
+            item['category'] = category
+            for stream in item['streams']:
+                stream.category = category
 
         category_order = settings.get('category_order', [])
 
