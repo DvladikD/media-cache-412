@@ -925,6 +925,19 @@ def main() -> int:
                 stream.tvg_shift = best.tvg_shift
             prepared.append({'name': official, 'category': category, 'streams': working})
 
+        epg_by_name = {
+            normalize(item['name']): item['streams'][0].epg_id
+            for item in prepared
+            if item['streams'][0].epg_id
+        }
+        for item in prepared:
+            if item['streams'][0].epg_id:
+                continue
+            inherited = epg_by_name.get(normalize(item['name']))
+            if inherited:
+                for stream in item['streams']:
+                    stream.epg_id = inherited
+
         category_order = settings.get('category_order', [])
 
         def order_key(item: dict) -> tuple[int, str]:
