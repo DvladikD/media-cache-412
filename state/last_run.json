@@ -1,10 +1,12 @@
 {
-  "generated_at": "2026-11-27T09:55:13.065180+00:00",
-  "channels": 1147,
-  "streams": 1592,
-  "live_streams": 645,
-  "backup_streams": 947,
-  "with_epg": 385,
+  "generated_at": "2026-11-27T10:10:14.460573+00:00",
+  "channels": 546,
+  "streams": 627,
+  "live_streams": 627,
+  "backup_streams": 0,
+  "tracked_streams": 1633,
+  "tracked_dead": 999,
+  "with_epg": 138,
   "categories": [
     "Азия",
     "Беларусь",
