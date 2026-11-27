@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-11-27T16:36:20.217045+00:00",
-  "channels": 513,
-  "streams": 603,
-  "live_streams": 603,
+  "generated_at": "2026-11-27T17:19:45.480993+00:00",
+  "channels": 508,
+  "streams": 630,
+  "live_streams": 630,
   "backup_streams": 0,
-  "tracked_streams": 1641,
-  "tracked_dead": 1031,
-  "with_epg": 170,
+  "tracked_streams": 1847,
+  "tracked_dead": 1160,
+  "with_epg": 178,
   "categories": [
     "Азия",
     "Беларусь",
@@ -26,6 +26,6 @@
     "Спорт",
     "Украина"
   ],
-  "sources": 21,
+  "sources": 23,
   "base_url": "https://DvladikD.github.io/media-cache-412/"
 }
