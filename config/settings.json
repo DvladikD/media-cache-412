@@ -15,6 +15,10 @@
   ],
   "exclude_words": ["xxx", "adult", "porn", "18+", "эротик", "секс", "камасутра"],
   "exclude_channels": [],
+  "force_include_urls": [
+    "http://31.148.48.15/Russkiy_Detektiv/index.m3u8",
+    "http://stream.mcquack.net/204/index.m3u8"
+  ],
   "priority_channels": [
     "Первый канал", "НТВ", "Россия 1", "Россия 24", "Матч ТВ", "СТС",
     "ТНТ", "Культура", "Пятый канал", "РЕН ТВ", "ТВ Центр", "Звезда",
@@ -25,6 +29,8 @@
   "parallel": 24,
   "probe_timeout_seconds": 10,
   "probe_retries": 2,
+  "decode_check": true,
+  "decode_timeout_seconds": 15,
   "hls_check": true,
   "max_segment_age_minutes": 120,
   "min_channels": 20,

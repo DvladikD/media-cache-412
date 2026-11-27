@@ -243,6 +243,7 @@ class Channel:
     category: str = ''
     ch_number: int = 0
     tvg_shift: int = 0
+    forced: bool = False
     attrs: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -619,20 +620,56 @@ def hls_freshness_ok(channel: Channel, settings: dict) -> bool:
     return True
 
 
+def decode_frame_ok(channel: Channel, settings: dict) -> bool:
+    """Пробует реально декодировать кадр — ловит «живые» ffprobe-заглушки."""
+    command = [
+        'ffmpeg', '-v', 'error',
+        '-user_agent', channel.user_agent or settings.get('user_agent', DEFAULT_UA),
+    ]
+    if channel.referrer:
+        command += ['-headers', f'Referer: {channel.referrer}\r\n']
+    command += ['-i', channel.url, '-frames:v', '1', '-f', 'null', '-']
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=int(settings.get('decode_timeout_seconds', 15)),
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+    return result.returncode == 0
+
+
 def check_streams(channels: list[Channel], settings: dict, no_probe: bool) -> None:
     if no_probe:
         for channel in channels:
             channel.score = 1
         return
+    for channel in channels:
+        if channel.forced:
+            channel.score = 1
 
     workers = int(settings.get('parallel', 16))
     log(f'Проверяю {len(channels)} потоков ({workers} параллельно) через ffprobe…')
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(probe_with_retry, channel, settings): channel for channel in channels}
+        to_check = [channel for channel in channels if not channel.forced]
+        futures = {pool.submit(probe_with_retry, channel, settings): channel for channel in to_check}
         for future in as_completed(futures):
             futures[future].score = future.result()
     alive = [channel for channel in channels if channel.score >= 0]
     log(f'Живых потоков после ffprobe: {len(alive)} из {len(channels)}')
+
+    if alive and settings.get('decode_check', True):
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {
+                pool.submit(decode_frame_ok, channel, settings): channel for channel in alive
+            }
+            for future in as_completed(futures):
+                if not future.result():
+                    futures[future].score = -1
+        alive = [channel for channel in channels if channel.score >= 0]
+        log(f'Живых потоков после декодирования кадра: {len(alive)}')
 
     if alive and settings.get('hls_check', True):
         with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -787,6 +824,11 @@ def main() -> int:
                 int(settings.get('state_max_age_days', 14)),
             )
         )
+        forced_urls = set(settings.get('force_include_urls', []))
+        for channel in channels:
+            if channel.url in forced_urls:
+                channel.forced = True
+                channel.score = 1
 
         kept: list[Channel] = []
         reserve: list[Channel] = []
@@ -851,6 +893,13 @@ def main() -> int:
                 reverse=True,
             )
             working = candidates[:max_streams]
+            group_epg_id = next((c.epg_id for c in working if c.epg_id), '')
+            group_shift = next((c.tvg_shift for c in working if c.tvg_shift), 0)
+            for stream in working:
+                if group_epg_id:
+                    stream.epg_id = group_epg_id
+                if group_shift:
+                    stream.tvg_shift = group_shift
             best = working[0]
             base_id = best.tvg_id.split('@')[0].lower()
             official = (

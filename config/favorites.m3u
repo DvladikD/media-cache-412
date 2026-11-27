@@ -1,5 +1,13 @@
 #EXTM3U
 #EXTINF:-1 group-title="Кино" tvg-id="russky-detektiv" tvg-name="Русский детектив" tvg-logo="https://i.imgur.com/H3qhN8S.png",Русский детектив
 https://flussonic.mkpnet.ru/tv-2997fed720614567/video.m3u8
+#EXTINF:-1 group-title="Кино" tvg-id="russky-detektiv" tvg-name="Русский детектив",Русский детектив
+https://flussonic.mkpnet.ru/tv-2997fed720614567/tracks-v1a1/mono.ts.m3u8
+#EXTINF:-1 group-title="Кино" tvg-id="russky-detektiv" tvg-name="Русский детектив",Русский детектив
+http://flussonic.mkpnet.ru/tv-2997fed720614567/video.m3u8
+#EXTINF:-1 group-title="Кино" tvg-id="russky-detektiv" tvg-name="Русский детектив",Русский детектив
+http://31.148.48.15/Russkiy_Detektiv/index.m3u8
+#EXTINF:-1 group-title="Кино" tvg-id="russky-detektiv" tvg-name="Русский детектив",Русский детектив
+http://stream.mcquack.net/204/index.m3u8
 #EXTINF:-1 group-title="Кино" tvg-id="CityEdenKinoDetektiv.ru@HD" tvg-name="Сити Эдем КиноДетектив" tvg-logo="https://i.imgur.com/9rKHwBV.png",Сити Эдем КиноДетектив
 https://cityeden.catcast.tv/content/41327/index.m3u8
