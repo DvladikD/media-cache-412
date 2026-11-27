@@ -31,6 +31,8 @@
   "probe_retries": 2,
   "decode_check": true,
   "decode_timeout_seconds": 15,
+  "black_check": true,
+  "black_check_seconds": 8,
   "hls_check": true,
   "max_segment_age_minutes": 120,
   "min_channels": 20,

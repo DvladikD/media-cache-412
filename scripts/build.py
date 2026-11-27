@@ -580,6 +580,35 @@ def inspect_manifest(url: str, channel: Channel, settings: dict) -> str | None:
         return None
 
 
+def black_frame_ok(channel: Channel, settings: dict) -> bool:
+    """Отсекает потоки, у которых первые секунды — чёрный экран."""
+    command = [
+        'ffmpeg', '-hide_banner', '-v', 'info',
+        '-user_agent', channel.user_agent or settings.get('user_agent', DEFAULT_UA),
+    ]
+    if channel.referrer:
+        command += ['-headers', f'Referer: {channel.referrer}\r\n']
+    command += [
+        '-ss', '2',
+        '-i', channel.url,
+        '-t', str(int(settings.get('black_check_seconds', 8))),
+        '-vf', 'blackdetect=d=4:pix_th=0.10',
+        '-f', 'null', '-',
+    ]
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=int(settings.get('decode_timeout_seconds', 15)) + 8,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return True  # не удалось проверить — не наказываем
+    if result.returncode != 0:
+        return False
+    return 'black_start:' not in result.stderr
+
+
 def hls_freshness_ok(channel: Channel, settings: dict) -> bool:
     """Отсекает VOD/заглушки и сильно просроченные HLS-плейлисты."""
     url = channel.url
@@ -670,6 +699,17 @@ def check_streams(channels: list[Channel], settings: dict, no_probe: bool) -> No
                     futures[future].score = -1
         alive = [channel for channel in channels if channel.score >= 0]
         log(f'Живых потоков после декодирования кадра: {len(alive)}')
+
+    if alive and settings.get('black_check', True):
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {
+                pool.submit(black_frame_ok, channel, settings): channel for channel in alive
+            }
+            for future in as_completed(futures):
+                if not future.result():
+                    futures[future].score = -1
+        alive = [channel for channel in channels if channel.score >= 0]
+        log(f'Живых потоков после проверки на чёрный экран: {len(alive)}')
 
     if alive and settings.get('hls_check', True):
         with ThreadPoolExecutor(max_workers=workers) as pool:
