@@ -34,4 +34,6 @@ https://ngrch.github.io/iptv/music.m3u
 https://DuckKota.github.io/iptv/playlists/language/rus.m3u
 https://raw.githubusercontent.com/Zaman-Topu/Ip-tv-Collection/main/FINAL_IPTV_COMPLETE.m3u
 https://raw.githubusercontent.com/dmandache/my-iptv-playlist/master/tv.m3u
+https://raw.githubusercontent.com/Dimonovich/TV/refs/heads/Dimonovich/FREE/TV
+https://raw.githubusercontent.com/loganettv/playlists/refs/heads/main/all.m3u
 config/favorites.m3u

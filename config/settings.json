@@ -5,6 +5,7 @@
   "github_repo": "iptv-auto",
   "base_url": "",
   "refresh_hours": 6,
+  "extra_epg_urls": ["http://epg.it999.ru/epg.xml.gz"],
   "countries": ["RU", "BY", "UA", "KZ", "AM", "AZ", "GE", "KG", "MD", "TJ", "TM", "UZ"],
   "tvg_id_suffixes": [".ru@", ".by@", ".ua@", ".kz@", ".am@", ".az@", ".ge@", ".kg@", ".md@", ".tj@", ".tm@", ".uz@"],
   "country_words": [

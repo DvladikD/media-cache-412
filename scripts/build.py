@@ -725,11 +725,13 @@ def check_streams(channels: list[Channel], settings: dict, no_probe: bool) -> No
 
 def write_playlist(streams: list[Channel], output_dir: Path, settings: dict, base_url: str) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    epg_url = f'{base_url.rstrip("/")}/epg.xml.gz'
+    epg_sources = [f'{base_url.rstrip("/")}/epg.xml.gz']
+    epg_sources.extend(settings.get('extra_epg_urls', []))
+    epg_attr = ','.join(epg_sources)
     refresh = int(settings.get('refresh_hours', 6))
     unique_channels = len({stream.ch_number for stream in streams})
     lines = [
-        f'#EXTM3U url-tvg="{epg_url}" refresh="{refresh}"',
+        f'#EXTM3U url-tvg="{epg_attr}" refresh="{refresh}"',
         f'# Generated {datetime.now(timezone.utc).isoformat()} — '
         f'{unique_channels} channels / {len(streams)} streams',
         f'# Live streams: {sum(1 for c in streams if c.score >= 0)}, '
