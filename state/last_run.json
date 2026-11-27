@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-11-27T21:11:19.488445+00:00",
-  "channels": 480,
-  "streams": 672,
-  "live_streams": 672,
+  "generated_at": "2026-11-27T21:31:00.902425+00:00",
+  "channels": 494,
+  "streams": 696,
+  "live_streams": 696,
   "backup_streams": 0,
   "tracked_streams": 1902,
-  "tracked_dead": 1164,
-  "with_epg": 128,
+  "tracked_dead": 1140,
+  "with_epg": 129,
   "categories": [
     "ДНР",
     "Детям",
