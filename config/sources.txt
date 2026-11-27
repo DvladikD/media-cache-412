@@ -27,3 +27,11 @@ https://raw.githubusercontent.com/iptv-com/iptv/main/lists/world.m3u
 https://tv-rus.github.io/ru.m3u
 https://raw.githubusercontent.com/maklarenm-ux/iptv-russia/main/playlist.m3u
 https://raw.githubusercontent.com/vasil133767-afk/my-iptv/main/playlist.m3u
+
+# Ещё источники и локальный список любимых каналов
+https://ngrch.github.io/iptv/cartoons.m3u
+https://ngrch.github.io/iptv/music.m3u
+https://DuckKota.github.io/iptv/playlists/language/rus.m3u
+https://raw.githubusercontent.com/Zaman-Topu/Ip-tv-Collection/main/FINAL_IPTV_COMPLETE.m3u
+https://raw.githubusercontent.com/dmandache/my-iptv-playlist/master/tv.m3u
+config/favorites.m3u

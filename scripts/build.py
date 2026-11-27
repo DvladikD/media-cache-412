@@ -31,7 +31,7 @@ from contextlib import nullcontext
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import unquote, urljoin
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree as ET
 from xml.sax.saxutils import quoteattr
@@ -488,6 +488,67 @@ def probe(channel: Channel, settings: dict) -> int:
     return score
 
 
+def probe_with_retry(channel: Channel, settings: dict) -> int:
+    for _attempt in range(max(1, int(settings.get('probe_retries', 2)))):
+        score = probe(channel, settings)
+        if score >= 0:
+            return score
+    return -1
+
+
+def inspect_manifest(url: str, channel: Channel, settings: dict) -> str | None:
+    headers = {
+        'User-Agent': channel.user_agent or settings.get('user_agent', DEFAULT_UA),
+    }
+    if channel.referrer:
+        headers['Referer'] = channel.referrer
+    try:
+        with urlopen(Request(url, headers=headers), timeout=12) as response:
+            return response.read(200_000).decode('utf-8', errors='replace')
+    except Exception:
+        return None
+
+
+def hls_freshness_ok(channel: Channel, settings: dict) -> bool:
+    """Отсекает VOD/заглушки и сильно просроченные HLS-плейлисты."""
+    url = channel.url
+    if '.m3u8' not in url.lower():
+        return True
+    if not settings.get('hls_check', True):
+        return True
+
+    body = inspect_manifest(url, channel, settings)
+    if body is None:
+        return True  # проверить не удалось — не наказываем stream
+    if '#EXT-X-ENDLIST' in body or 'PLAYLIST-TYPE:VOD' in body.upper():
+        return False
+    lowered = body.lower()
+    if any(word in lowered for word in ('geoblock', 'geo-block', 'not available', 'access denied')):
+        return False
+
+    dates = re.findall(r'#EXT-X-PROGRAM-DATE-TIME:([^\r\n]+)', body)
+    if not dates:
+        variants = [
+            line.strip() for line in body.splitlines()
+            if line.strip() and not line.startswith('#')
+        ]
+        if variants:
+            variant_url = urljoin(url, variants[0])
+            variant = inspect_manifest(variant_url, channel, settings)
+            if variant and '#EXT-X-ENDLIST' in variant:
+                return False
+            dates = re.findall(r'#EXT-X-PROGRAM-DATE-TIME:([^\r\n]+)', variant or '')
+    if dates:
+        try:
+            stamp = datetime.fromisoformat(dates[-1].strip().replace('Z', '+00:00'))
+            age_minutes = (datetime.now(timezone.utc) - stamp).total_seconds() / 60
+            if age_minutes > int(settings.get('max_segment_age_minutes', 120)):
+                return False
+        except ValueError:
+            pass
+    return True
+
+
 def check_streams(channels: list[Channel], settings: dict, no_probe: bool) -> None:
     if no_probe:
         for channel in channels:
@@ -497,11 +558,22 @@ def check_streams(channels: list[Channel], settings: dict, no_probe: bool) -> No
     workers = int(settings.get('parallel', 16))
     log(f'Проверяю {len(channels)} потоков ({workers} параллельно) через ffprobe…')
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(probe, channel, settings): channel for channel in channels}
+        futures = {pool.submit(probe_with_retry, channel, settings): channel for channel in channels}
         for future in as_completed(futures):
             futures[future].score = future.result()
-    alive = sum(1 for channel in channels if channel.score >= 0)
-    log(f'Живых потоков: {alive} из {len(channels)}')
+    alive = [channel for channel in channels if channel.score >= 0]
+    log(f'Живых потоков после ffprobe: {len(alive)} из {len(channels)}')
+
+    if alive and settings.get('hls_check', True):
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {
+                pool.submit(hls_freshness_ok, channel, settings): channel for channel in alive
+            }
+            for future in as_completed(futures):
+                if not future.result():
+                    futures[future].score = -1
+        log(f'Живых потоков после проверки HLS: '
+            f'{sum(1 for channel in channels if channel.score >= 0)}')
 
 
 def write_playlist(streams: list[Channel], output_dir: Path, settings: dict, base_url: str) -> None:

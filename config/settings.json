@@ -19,10 +19,14 @@
     "Первый канал", "НТВ", "Россия 1", "Россия 24", "Матч ТВ", "СТС",
     "ТНТ", "Культура", "Пятый канал", "РЕН ТВ", "ТВ Центр", "Звезда",
     "Спутник", "Мультиландия", "Карусель",
-    "NTV", "Channel One Russia", "Rossiya 1", "Russia 1", "CTC", "TNT", "Match TV"
+    "NTV", "Channel One Russia", "Rossiya 1", "Russia 1", "CTC", "TNT", "Match TV",
+    "Русский детектив", "Сити Эдем КиноДетектив"
   ],
   "parallel": 24,
   "probe_timeout_seconds": 10,
+  "probe_retries": 2,
+  "hls_check": true,
+  "max_segment_age_minutes": 120,
   "min_channels": 20,
   "max_streams_per_channel": 4,
   "keep_dead_streams": true,
@@ -80,7 +84,8 @@
     "пятый канал": "Пятый канал",
     "рен тв": "РЕН ТВ",
     "звезда": "Звезда",
-    "первый республиканский": "Первый Республиканский (ДНР)"
+    "первый республиканский": "Первый Республиканский (ДНР)",
+    "русский детектив": "Русский детектив"
   },
   "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 }
