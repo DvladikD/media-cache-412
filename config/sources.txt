@@ -35,4 +35,15 @@ https://DuckKota.github.io/iptv/playlists/language/rus.m3u
 https://raw.githubusercontent.com/dmandache/my-iptv-playlist/master/tv.m3u
 https://raw.githubusercontent.com/Dimonovich/TV/refs/heads/Dimonovich/FREE/TV
 https://raw.githubusercontent.com/loganettv/playlists/refs/heads/main/all.m3u
+
+# Новые источники (поиск 27.11.2026)
+https://raw.githubusercontent.com/Phoenix89S/IpTV_playlist_2026Ru/main/Denis_iptv_2026.m3u
+https://raw.githubusercontent.com/Phoenix89S/IpTV_playlist_2026Ru/main/chistka.m3u
+https://raw.githubusercontent.com/Phoenix89S/IpTV_playlist_2026Ru/main/Raznie.m3u
+https://raw.githubusercontent.com/Phoenix89S/IpTV_playlist_2026Ru/main/merged_epg_playlist.m3u
+https://raw.githubusercontent.com/Vitaliy-MAR/IPTVmir/main/IPTVmir.m3u8
+https://raw.githubusercontent.com/timinside/IPTVru/master/IPTVmir.m3u8
+https://raw.githubusercontent.com/artem-art998/IPTVru/main/iptv126.m3u
+https://raw.githubusercontent.com/kaban936-tech/IPTVmir.m3u8/main/IPTVmir.m3u8
+https://raw.githubusercontent.com/empty180/IPTVrus/main/ekb.m3u
 config/favorites.m3u

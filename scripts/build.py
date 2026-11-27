@@ -199,7 +199,7 @@ def load_database_names(settings: dict) -> dict[str, str]:
 
 
 def assign_category(channel: Channel, settings: dict) -> str:
-    name = normalize(channel.name)
+    name = normalize(f'{channel.name} {channel.official_name}')
     if any(keyword in name for keyword in settings.get('dnr_keywords', [])):
         return settings.get('dnr_category', 'ДНР')
 
@@ -234,6 +234,9 @@ def assign_category(channel: Channel, settings: dict) -> str:
     if is_russian:
         if mapped in settings.get('topic_categories', []):
             return mapped
+        for topic in settings.get('_epg_categories', {}).get(epg_id, ()):
+            if topic in settings.get('topic_categories', []):
+                return topic
         for topic, keywords in settings.get('topic_name_keywords', {}).items():
             if any(keyword in name for keyword in keywords):
                 return topic
@@ -450,6 +453,38 @@ def load_epg_channels(
 
     log(f'EPG: прочитано {len(by_id)} каналов')
     return by_id, raw_by_id, xml_by_id, tv_attrs
+
+
+def load_epg_categories(epg_path: Path, settings: dict) -> dict[str, set[str]]:
+    """Категории программ из XMLTV — помогают разложить каналы по темам."""
+    raw_map: dict[str, set[str]] = {}
+    with gzip.open(epg_path, 'rb') as source:
+        for _event, element in ET.iterparse(source, events=('end',)):
+            if element.tag == 'programme':
+                channel_id = element.get('channel', '')
+                categories = {
+                    (node.text or '').strip() for node in element.findall('category')
+                }
+                if channel_id and categories:
+                    raw_map.setdefault(channel_id, set()).update(categories)
+                element.clear()
+            elif element.tag == 'channel':
+                element.clear()
+
+    mapping = settings.get('epg_category_map', {})
+    result: dict[str, set[str]] = {}
+    for channel_id, categories in raw_map.items():
+        topics = set()
+        for category in categories:
+            lowered = category.lower()
+            for key, topic in mapping.items():
+                if key.lower() in lowered:
+                    topics.add(topic)
+                    break
+        if topics:
+            result[channel_id] = topics
+    log(f'EPG-категории: {len(result)} каналов')
+    return result
 
 
 def build_name_index(by_id: dict[str, list[str]]) -> tuple[dict[str, list[str]], list[str]]:
@@ -891,10 +926,13 @@ def main() -> int:
             )
         )
         forced_urls = set(settings.get('force_include_urls', []))
+        id_overrides = settings.get('epg_id_overrides', {})
         for channel in channels:
             if channel.url in forced_urls:
                 channel.forced = True
                 channel.score = 1
+            if channel.epg_id in id_overrides:
+                channel.epg_id = id_overrides[channel.epg_id]
 
         kept: list[Channel] = []
         reserve: list[Channel] = []
@@ -914,6 +952,8 @@ def main() -> int:
                 channel.epg_id, channel.epg_score = match_epg(
                     channel, by_id, name_to_ids, token_index
                 )
+                if channel.epg_id in id_overrides:
+                    channel.epg_id = id_overrides[channel.epg_id]
                 kept.append(channel)
             else:
                 reserve.append(channel)

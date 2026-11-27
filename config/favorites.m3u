@@ -9,5 +9,7 @@ http://flussonic.mkpnet.ru/tv-2997fed720614567/video.m3u8
 http://31.148.48.15/Russkiy_Detektiv/index.m3u8
 #EXTINF:-1 group-title="Кино" tvg-id="russky-detektiv" tvg-name="Русский детектив",Русский детектив
 http://stream.mcquack.net/204/index.m3u8
+#EXTINF:-1 group-title="Кино" tvg-id="russky-detektiv" tvg-name="Русский детектив",Русский детектив
+http://ott.watch/stream/6HAPZWKKG3/204.m3u8
 #EXTINF:-1 group-title="Кино" tvg-id="CityEdenKinoDetektiv.ru@HD" tvg-name="Сити Эдем КиноДетектив" tvg-logo="https://i.imgur.com/9rKHwBV.png",Сити Эдем КиноДетектив
 https://cityeden.catcast.tv/content/41327/index.m3u8
