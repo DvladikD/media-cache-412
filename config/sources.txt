@@ -21,3 +21,9 @@ https://DuckKota.github.io/iptv/playlists/country/ru.m3u
 
 # ДНР / Донбасс — локальный список проверенных потоков
 config/dnr.m3u
+
+# Ещё RU/CIS-источники
+https://raw.githubusercontent.com/iptv-com/iptv/main/lists/world.m3u
+https://tv-rus.github.io/ru.m3u
+https://raw.githubusercontent.com/maklarenm-ux/iptv-russia/main/playlist.m3u
+https://raw.githubusercontent.com/vasil133767-afk/my-iptv/main/playlist.m3u

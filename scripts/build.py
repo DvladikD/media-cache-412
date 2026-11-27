@@ -39,12 +39,12 @@ from xml.sax.saxutils import quoteattr
 ROOT = Path(__file__).resolve().parent.parent
 ATTR_RE = re.compile(r'([\w-]+)="([^"]*)"')
 MARK_RE = re.compile(r'[ⓈⓉⒼⓏⓇⓎⒻⒽⓁ✓]')
-QUALITY_RE = re.compile(r'\b(hd|sd|4k|uhd|fhd|hdr|hevc)\b', re.IGNORECASE)
+QUALITY_RE = re.compile(r'\b(hd|sd|4k|uhd|fhd|hdr|hevc|\d{3,4}[ip])\b', re.IGNORECASE)
 BRACKET_RE = re.compile(r'[\(\[][^\)\]]*[\)\]]')
 PAREN_RE = re.compile(r'\(([^)]*)\)')
 SQUARE_RE = re.compile(r'\[[^\]]*\]')
 SHIFT_RE = re.compile(r'\(\s*([+-]\d{1,2})\s*\)')
-QUALITY_ONLY_RE = re.compile(r'(hd|sd|4k|uhd|fhd|hdr|hevc|\d+p)', re.IGNORECASE)
+QUALITY_ONLY_RE = re.compile(r'(hd|sd|4k|uhd|fhd|hdr|hevc|\d{3,4}[ip])', re.IGNORECASE)
 COUNTRY_TAGS = {
     'RU', 'BY', 'UA', 'KZ', 'AM', 'AZ', 'GE', 'KG', 'MD', 'TJ', 'TM', 'UZ',
 }
@@ -513,6 +513,8 @@ def write_playlist(streams: list[Channel], output_dir: Path, settings: dict, bas
         f'#EXTM3U url-tvg="{epg_url}" refresh="{refresh}"',
         f'# Generated {datetime.now(timezone.utc).isoformat()} — '
         f'{unique_channels} channels / {len(streams)} streams',
+        f'# Live streams: {sum(1 for c in streams if c.score >= 0)}, '
+        f'backup streams: {sum(1 for c in streams if c.score < 0)}',
     ]
 
     def safe(value: str) -> str:
@@ -537,6 +539,31 @@ def write_playlist(streams: list[Channel], output_dir: Path, settings: dict, bas
         lines.append(channel.url)
     (output_dir / 'playlist.m3u').write_text('\n'.join(lines) + '\n', encoding='utf-8')
     log(f'Плейлист записан: {unique_channels} каналов, {len(streams)} потоков')
+
+
+def write_status(prepared: list[dict], output_dir: Path, report: dict) -> None:
+    """Публикует простой отчёт о рабочих и резервных каналах."""
+    dead = [
+        item['name'] for item in prepared
+        if not any(stream.score >= 0 for stream in item['streams'])
+    ]
+    lines = [
+        f"# Статус плейлиста — {report['generated_at']}",
+        '',
+        f"Каналов всего: {report['channels']}",
+        f"Потоков всего: {report['streams']}",
+        f"Рабочих потоков: {report['live_streams']}",
+        f"Резервных потоков: {report['backup_streams']}",
+        f"Каналов без рабочего потока: {len(dead)}",
+        '',
+    ]
+    if dead:
+        lines.append('Каналы только с резервными (сейчас не отвечают):')
+        lines.extend(f'- {name}' for name in dead)
+    else:
+        lines.append('Все каналы имеют хотя бы один рабочий поток.')
+    (output_dir / 'status.txt').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+    log(f'Статус записан: {len(dead)} каналов без рабочего потока')
 
 
 def write_epg(
@@ -588,6 +615,7 @@ def main() -> int:
         name_to_ids, _name_keys = build_name_index(by_id)
         token_index = build_token_index(name_to_ids)
         priority_names = {normalize(name) for name in settings.get('priority_channels', [])}
+        excluded_names = {normalize(name) for name in settings.get('exclude_channels', [])}
         canonical_names = load_canonical_names(settings)
         database_names = load_database_names(settings)
         name_overrides = settings.get('name_overrides', {})
@@ -613,6 +641,8 @@ def main() -> int:
         seen_urls: set[str] = set()
         for channel in channels:
             if is_blocked(channel, settings):
+                continue
+            if channel.norm_name in excluded_names or normalize(channel.name) in excluded_names:
                 continue
             url_key = channel.url.strip()
             if not url_key or url_key in seen_urls:
@@ -738,6 +768,7 @@ def main() -> int:
         (args.output_dir / 'report.json').write_text(
             json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8'
         )
+        write_status(prepared, args.output_dir, report)
         log(f'Готово: {report["channels"]} каналов, {report["streams"]} потоков, '
             f'{report["with_epg"]} с EPG')
     return 0

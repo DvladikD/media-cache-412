@@ -1,5 +1,6 @@
 #EXTM3U
 #EXTINF:-1 group-title="ДНР" tvg-name="Первый Республиканский (ДНР)",Первый Республиканский (ДНР)
+#EXTVLCOPT:http-referrer=https://televizor24tochka.ru/
 https://streaming.televizor-24-tochka.ru/live/27.m3u8
 #EXTINF:-1 group-title="ДНР" tvg-name="Луганск 24",Луганск 24
 https://streaming.televizor-24-tochka.ru/live/29.m3u8
