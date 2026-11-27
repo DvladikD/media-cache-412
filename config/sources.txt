@@ -18,3 +18,6 @@ https://loganettv.github.io/playlists/mega.m3u
 https://ngrch.github.io/iptv/ru.m3u
 https://raw.githubusercontent.com/Dimonovich/TV/Dimonovich%2FFREE/.m3u
 https://DuckKota.github.io/iptv/playlists/country/ru.m3u
+
+# ДНР / Донбасс — локальный список проверенных потоков
+config/dnr.m3u

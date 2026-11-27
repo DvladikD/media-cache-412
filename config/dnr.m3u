@@ -1,0 +1,13 @@
+#EXTM3U
+#EXTINF:-1 group-title="ДНР" tvg-name="Первый Республиканский (ДНР)",Первый Республиканский (ДНР)
+https://streaming.televizor-24-tochka.ru/live/27.m3u8
+#EXTINF:-1 group-title="ДНР" tvg-name="Луганск 24",Луганск 24
+https://streaming.televizor-24-tochka.ru/live/29.m3u8
+#EXTINF:-1 group-title="ДНР" tvg-name="Оплот ТВ",Оплот ТВ
+http://31.131.141.195:8000/play/a006/index.m3u8
+#EXTINF:-1 group-title="ДНР" tvg-name="Оплот ТВ SD",Оплот ТВ SD
+http://31.131.139.253:9002/oplot_hd/index.m3u8
+#EXTINF:-1 group-title="ДНР" tvg-name="Оплот 2",Оплот 2
+http://91.224.16.9:7779/Oplot_2/index.m3u8
+#EXTINF:-1 group-title="ДНР" tvg-name="Новороссия ТВ",Новороссия ТВ
+http://31.131.139.253:9002/novoros/index.m3u8

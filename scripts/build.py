@@ -48,6 +48,7 @@ QUALITY_ONLY_RE = re.compile(r'(hd|sd|4k|uhd|fhd|hdr|hevc|\d+p)', re.IGNORECASE)
 COUNTRY_TAGS = {
     'RU', 'BY', 'UA', 'KZ', 'AM', 'AZ', 'GE', 'KG', 'MD', 'TJ', 'TM', 'UZ',
 }
+IGNORED_PARENS = {'архив', 'archive', 'архивная версия', 'запись', 'recap'}
 BAD_CHARS_RE = re.compile(r'[^\w ]+', re.UNICODE)
 SPACE_RE = re.compile(r'\s+')
 
@@ -84,6 +85,8 @@ def kept_parentheses(value: str) -> list[str]:
         if re.fullmatch(r'[+-]?\d{1,2}', inner):
             continue
         if inner.upper() in COUNTRY_TAGS:
+            continue
+        if inner.lower() in IGNORED_PARENS:
             continue
         result.append(inner)
     return result
@@ -196,6 +199,9 @@ def load_database_names(settings: dict) -> dict[str, str]:
 
 
 def assign_category(channel: Channel, settings: dict) -> str:
+    name = normalize(channel.name)
+    if any(keyword in name for keyword in settings.get('dnr_keywords', [])):
+        return settings.get('dnr_category', 'ДНР')
     country_categories = settings.get('country_categories', {})
     country = channel.country.strip().upper()
     if country in country_categories:
@@ -592,7 +598,11 @@ def main() -> int:
             if not url or url.startswith('#'):
                 continue
             try:
-                found = parse_m3u(fetch_text(url), url)
+                if url.startswith(('http://', 'https://')):
+                    text = fetch_text(url)
+                else:
+                    text = (ROOT / url).read_text(encoding='utf-8-sig')
+                found = parse_m3u(text, url)
                 channels.extend(found)
                 log(f'Источник {url}: {len(found)} каналов')
             except Exception as error:  # источник может временно лежать
