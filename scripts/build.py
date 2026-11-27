@@ -41,6 +41,13 @@ ATTR_RE = re.compile(r'([\w-]+)="([^"]*)"')
 MARK_RE = re.compile(r'[ⓈⓉⒼⓏⓇⓎⒻⒽⓁ✓]')
 QUALITY_RE = re.compile(r'\b(hd|sd|4k|uhd|fhd|hdr|hevc)\b', re.IGNORECASE)
 BRACKET_RE = re.compile(r'[\(\[][^\)\]]*[\)\]]')
+PAREN_RE = re.compile(r'\(([^)]*)\)')
+SQUARE_RE = re.compile(r'\[[^\]]*\]')
+SHIFT_RE = re.compile(r'\(\s*([+-]\d{1,2})\s*\)')
+QUALITY_ONLY_RE = re.compile(r'(hd|sd|4k|uhd|fhd|hdr|hevc|\d+p)', re.IGNORECASE)
+COUNTRY_TAGS = {
+    'RU', 'BY', 'UA', 'KZ', 'AM', 'AZ', 'GE', 'KG', 'MD', 'TJ', 'TM', 'UZ',
+}
 BAD_CHARS_RE = re.compile(r'[^\w ]+', re.UNICODE)
 SPACE_RE = re.compile(r'\s+')
 
@@ -65,14 +72,55 @@ def normalize(value: str) -> str:
     return text
 
 
+def kept_parentheses(value: str) -> list[str]:
+    """Скобки, которые нужно сохранить: регион/версия, но не HD/гео/сдвиг."""
+    result: list[str] = []
+    for inner in PAREN_RE.findall(value or ''):
+        inner = inner.strip()
+        if not inner:
+            continue
+        if QUALITY_ONLY_RE.fullmatch(inner):
+            continue
+        if re.fullmatch(r'[+-]?\d{1,2}', inner):
+            continue
+        if inner.upper() in COUNTRY_TAGS:
+            continue
+        result.append(inner)
+    return result
+
+
 def clean_official(value: str) -> str:
-    """Читаемое имя канала без quality-суффиксов, геотегов и таймшифтов."""
+    """Читаемое имя: убирает HD/гео/сдвиг, но сохраняет регион в скобках."""
     text = (value or '').strip()
     text = MARK_RE.sub(' ', text)
-    text = BRACKET_RE.sub(' ', text)
+    text = SHIFT_RE.sub(' ', text)
+    text = SQUARE_RE.sub(' ', text)
+
+    def strip_unneeded(match: re.Match[str]) -> str:
+        inner = match.group(1).strip()
+        if inner in kept_parentheses(value):
+            return match.group(0)
+        return ' '
+
+    text = PAREN_RE.sub(strip_unneeded, text)
     text = QUALITY_RE.sub(' ', text)
     text = SPACE_RE.sub(' ', text).strip(' -–—')
     return text
+
+
+def with_source_details(official: str, source_name: str, shift: int) -> str:
+    """Добавляет к каноническому имени регион и сдвиг из исходного плейлиста."""
+    name = official.strip()
+    for region in kept_parentheses(source_name):
+        if region not in name:
+            name = f'{name} ({region})'
+    if '|' in source_name:
+        detail = clean_official(source_name.split('|')[-1])
+        if detail and detail.lower() not in name.lower() and len(detail) <= 40:
+            name = f'{name} ({detail})'
+    if shift and f'{shift:+d}' not in name:
+        name = f'{name} ({shift:+d})'
+    return name
 
 
 def pick_display_name(raw_names: list[str], source_name: str) -> str:
@@ -188,6 +236,7 @@ class Channel:
     official_name: str = ''
     category: str = ''
     ch_number: int = 0
+    tvg_shift: int = 0
     attrs: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -232,6 +281,10 @@ def parse_m3u(text: str, source: str) -> list[Channel]:
             attrs, name, options = pending
             name = unquote(name)
             attrs = {key: unquote(value) for key, value in attrs.items()}
+            shift_match = SHIFT_RE.search(name)
+            tvg_shift = int(shift_match.group(1)) if shift_match else 0
+            if not -12 <= tvg_shift <= 12:
+                tvg_shift = 0
             user_agent = attrs.get('http-user-agent', '')
             referrer = attrs.get('http-referrer', '')
             for key, value in options:
@@ -251,6 +304,7 @@ def parse_m3u(text: str, source: str) -> list[Channel]:
                     user_agent=user_agent,
                     referrer=referrer,
                     source=source,
+                    tvg_shift=tvg_shift,
                     attrs=attrs,
                 )
             )
@@ -458,6 +512,8 @@ def write_playlist(streams: list[Channel], output_dir: Path, settings: dict, bas
         attrs = [f'ch-number="{channel.ch_number}"']
         if channel.epg_id:
             attrs.append(f'tvg-id="{safe(channel.epg_id)}"')
+        if channel.tvg_shift:
+            attrs.append(f'tvg-shift="{channel.tvg_shift}"')
         attrs.append(f'tvg-name="{safe(name)}"')
         if channel.logo:
             attrs.append(f'tvg-logo="{safe(channel.logo)}"')
@@ -569,7 +625,10 @@ def main() -> int:
 
         groups: dict[str, list[Channel]] = {}
         for channel in kept:
-            groups.setdefault(channel.norm_name, []).append(channel)
+            group_key = channel.norm_name
+            if channel.tvg_shift:
+                group_key = f'{group_key}|{channel.tvg_shift:+d}'
+            groups.setdefault(group_key, []).append(channel)
         max_streams = int(settings.get('max_streams_per_channel', 3))
         prepared: list[dict] = []
         for norm_name, options in groups.items():
@@ -598,10 +657,17 @@ def main() -> int:
                     else clean_official(best.name)
                 )
             )
+            shift_in_name = SHIFT_RE.search(official)
+            if shift_in_name and not best.tvg_shift:
+                detected = int(shift_in_name.group(1))
+                if -12 <= detected <= 12:
+                    best.tvg_shift = detected
+            official = with_source_details(official, best.name, best.tvg_shift)
             category = assign_category(best, settings)
             for stream in working:
                 stream.official_name = official
                 stream.category = category
+                stream.tvg_shift = best.tvg_shift
             prepared.append({'name': official, 'category': category, 'streams': working})
 
         category_order = settings.get('category_order', [])
