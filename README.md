@@ -1,8 +1,8 @@
-# Автообновляемый IPTV-плейлист (OTT Navigator, Россия и СНГ)
+# Автообновляемый медиа-плейлист (Россия и СНГ)
 
 Рабочая установка: **`DvladikD/media-cache-412`**. Репозиторий публичный, переименован на нейтральное имя, чтобы не привлекать внимание.
 
-**Плейлист для OTT Navigator:**
+**Адрес плейлиста:**
 
 ```
 https://DvladikD.github.io/media-cache-412/playlist.m3u
@@ -22,7 +22,7 @@ https://DvladikD.github.io/media-cache-412/playlist.m3u
 
 В шапке плейлиста — `url-tvg` (сначала `epg.it999.ru`, затем свой `epg.xml.gz`) и `refresh="6"`.
 
-## Что уже настроено в OTT Navigator
+## Настройки плеера (один раз)
 
 - `Settings → Provider data → Channel processing → Duplicate channels → Fold duplicate channels to a single element` (**Premium**) — объединение дубликатов и авто-переключение при ошибке; режим «by name within one category».
 - Сортировка: `order from provider playlist`, чтобы сохранить порядок категорий и `ch-number`.
