@@ -170,8 +170,8 @@ def load_canonical_names(settings: dict) -> dict[str, str]:
     return names
 
 
-def load_database_names(settings: dict) -> dict[str, str]:
-    """ID iptv-org (ChannelOne.ru) → русское имя из alt_names."""
+def load_database_names(settings: dict) -> tuple[dict[str, str], dict[str, set[str]]]:
+    """ID iptv-org → (русское имя, категории из базы каналов)."""
     url = settings.get(
         'channels_csv_url',
         'https://raw.githubusercontent.com/iptv-org/database/master/data/channels.csv',
@@ -180,8 +180,10 @@ def load_database_names(settings: dict) -> dict[str, str]:
         raw = fetch_text(url, timeout=120)
     except Exception as error:
         log(f'Не удалось загрузить channels.csv: {error}')
-        return {}
+        return {}, {}
     names: dict[str, str] = {}
+    categories: dict[str, set[str]] = {}
+    topic_map = settings.get('database_category_map', {})
     for row in csv.DictReader(io.StringIO(raw)):
         channel_id = (row.get('id') or '').strip()
         if not channel_id:
@@ -194,8 +196,19 @@ def load_database_names(settings: dict) -> dict[str, str]:
         name = clean_official(russian[0] if russian else row.get('name', ''))
         if name:
             names[channel_id.lower()] = name
-    log(f'Справочник имён iptv-org/database: {len(names)} записей')
-    return names
+        raw_categories = {
+            part.strip().lower() for part in (row.get('categories') or '').split(';')
+        }
+        topics = set()
+        for raw in raw_categories:
+            for key, topic in topic_map.items():
+                if key.lower() == raw:
+                    topics.add(topic)
+                    break
+        if topics:
+            categories[channel_id.lower()] = topics
+    log(f'Справочник iptv-org/database: {len(names)} имён, {len(categories)} категорий')
+    return names, categories
 
 
 def assign_category(channel: Channel, settings: dict) -> str:
@@ -239,6 +252,10 @@ def assign_category(channel: Channel, settings: dict) -> str:
     if is_russian:
         if mapped in settings.get('topic_categories', []):
             return mapped
+        for db_id in {tvg_id.split('@')[0], epg_id.split('@')[0]}:
+            for topic in settings.get('_database_categories', {}).get(db_id, ()):
+                if topic in settings.get('topic_categories', []):
+                    return topic
         for topic in settings.get('_epg_categories', {}).get(epg_id, ()):
             if topic in settings.get('topic_categories', []):
                 return topic
@@ -904,7 +921,8 @@ def main() -> int:
         priority_names = {normalize(name) for name in settings.get('priority_channels', [])}
         excluded_names = {normalize(name) for name in settings.get('exclude_channels', [])}
         canonical_names = load_canonical_names(settings)
-        database_names = load_database_names(settings)
+        database_names, database_categories = load_database_names(settings)
+        settings['_database_categories'] = database_categories
         name_overrides = settings.get('name_overrides', {})
 
         channels: list[Channel] = []
