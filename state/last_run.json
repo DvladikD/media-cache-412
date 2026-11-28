@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-11-28T07:01:43.197107+00:00",
-  "channels": 483,
-  "streams": 688,
-  "live_streams": 688,
+  "generated_at": "2026-11-28T08:18:29.201779+00:00",
+  "channels": 550,
+  "streams": 797,
+  "live_streams": 797,
   "backup_streams": 0,
-  "tracked_streams": 1915,
-  "tracked_dead": 1146,
-  "with_epg": 134,
+  "tracked_streams": 2402,
+  "tracked_dead": 1528,
+  "with_epg": 141,
   "categories": [
     "ДНР",
     "Детям",
@@ -22,6 +22,6 @@
     "СНГ",
     "Спорт"
   ],
-  "sources": 31,
+  "sources": 40,
   "base_url": "https://DvladikD.github.io/media-cache-412/"
 }
