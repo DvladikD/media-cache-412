@@ -46,4 +46,15 @@ https://raw.githubusercontent.com/timinside/IPTVru/master/IPTVmir.m3u8
 https://raw.githubusercontent.com/artem-art998/IPTVru/main/iptv126.m3u
 https://raw.githubusercontent.com/kaban936-tech/IPTVmir.m3u8/main/IPTVmir.m3u8
 https://raw.githubusercontent.com/empty180/IPTVrus/main/ekb.m3u
+
+# Новые источники (поиск 28.11.2026)
+https://raw.githubusercontent.com/axiblade777/vulkaniptv/main/playlist.m3u8
+https://raw.githubusercontent.com/okemake116/iptv-playlist/main/free-channels.m3u
+https://raw.githubusercontent.com/slawa99-prog/sv-iptv/main/expanded-preview.m3u
+https://raw.githubusercontent.com/slawa99-prog/sv-iptv/main/cis-3of3.m3u
+https://raw.githubusercontent.com/troypaha-netizen/my-iptv-playlist/main/my-iptv.m3u
+https://raw.githubusercontent.com/iptv-org/iptv/master/streams/ru.m3u
+https://raw.githubusercontent.com/iptv-org/iptv/master/streams/ru_smotrim.m3u
+https://raw.githubusercontent.com/iptv-org/iptv/master/streams/ru_tvteleport.m3u
+https://raw.githubusercontent.com/iptv-org/iptv/master/streams/ru_televizor24.m3u
 config/favorites.m3u
