@@ -1,80 +1,77 @@
-# Автообновляемый IPTV-плейлист для OTT Navigator (Россия и СНГ)
+# Автообновляемый IPTV-плейлист (OTT Navigator, Россия и СНГ)
 
-Готовый конвейер: **раз настраиваете → дальше работает сам**.
+Рабочая установка: **`DvladikD/media-cache-412`**. Репозиторий публичный, переименован на нейтральное имя, чтобы не привлекать внимание.
+
+**Плейлист для OTT Navigator:**
+
+```
+https://DvladikD.github.io/media-cache-412/playlist.m3u
+```
+
+Добавлять именно **ссылку**, не файл: плейлист из файла плеер не обновляет.
+
+## Как это работает
 
 Каждые 6 часов GitHub Actions:
 
-1. скачивает публичные плейлисты из `config/sources.txt`;
-2. оставляет каналы России/СНГ и каналы, для которых нашёлся EPG;
-3. автоматически подбирает `tvg-id` по XMLTV (`iptvx.one`), сопоставляя названия;
-4. проверяет каждый поток через `ffprobe` и оставляет один лучший (по разрешению) рабочий stream на канал;
-5. публикует на GitHub Pages:
-   - `playlist.m3u`
-   - `epg.xml.gz` (только каналы вашего плейлиста — компактный гид).
+1. скачивает источники из `config/sources.txt` (публичные списки + локальные `config/dnr.m3u`, `config/favorites.m3u`);
+2. отбирает каналы России/СНГ и ДНР, дедуплицирует потоки, сопоставляет `tvg-id` с XMLTV;
+3. проверяет каждый поток: `ffprobe` с повторами, реальное декодирование кадра, чёрный экран, свежесть HLS-сегментов, geo/VOD-заглушки;
+4. публикует только живые потоки (до `max_streams_per_channel` на канал); нерабочие остаются в `state/known_streams.json` и возвращаются автоматически, если оживут;
+5. публикует на GitHub Pages: `playlist.m3u`, `epg.xml.gz`, `report.json`, `status.txt`.
 
-В шапке плейлиста уже прописаны `url-tvg` и `refresh="6"`, поэтому OTT Navigator сам обновляет и список, и программу.
+В шапке плейлиста — `url-tvg` (сначала `epg.it999.ru`, затем свой `epg.xml.gz`) и `refresh="6"`.
 
-## Разовую настройку сделать один раз
+## Что уже настроено в OTT Navigator
 
-1. Создайте **публичный** репозиторий (например `iptv-auto`) на GitHub.
-2. Загрузите сюда все файлы этой папки (можно `git init && git add . && git commit -m init && git push`).
-3. Зайдите в **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-4. Дождитесь первого запуска Actions (вкладка **Actions** → «Обновление IPTV-плейлиста» → **Run workflow** для немедленного старта). Первый прогон занимает ~10–20 минут: проверяются сотни потоков.
-5. В OTT Navigator добавьте провайдера по ссылке:
+- `Settings → Provider data → Channel processing → Duplicate channels → Fold duplicate channels to a single element` (**Premium**) — объединение дубликатов и авто-переключение при ошибке; режим «by name within one category».
+- Сортировка: `order from provider playlist`, чтобы сохранить порядок категорий и `ch-number`.
 
-   ```
-   https://ВАШ_LOGIN.github.io/iptv-auto/playlist.m3u
-   ```
+## Структура
 
-   Это должно быть именно **ссылка**, не файл: плейлист, добавленный из файла, никогда не обновляется.
+| Путь | Назначение |
+|---|---|
+| `scripts/build.py` | сборщик плейлиста и EPG |
+| `config/sources.txt` | источники (одна ссылка на строку; `config/*.m3u` — локальные списки) |
+| `config/settings.json` | фильтры, категории, приоритеты, лимиты проверки |
+| `config/dnr.m3u` | ДНР/Донбасс: Первый Республиканский, Оплот, Новороссия |
+| `config/favorites.m3u` | Русский детектив, Чип и Дейл, Сити Эдем КиноДетектив |
+| `state/known_streams.json` | все известные потоки с статусом (живой/нерабочий) |
+| `state/last_run.json` | статистика последнего запуска |
+| `CHANGELOG.md` | история обновлений |
 
-Готово. Дальше вмешательство не требуется: workflow ходит по cron, коммитит `state/last_run.json` (это защищает расписание от отключения после 60 дней неактивности) и перевыкладывает плейлист.
+## Что можно менять
 
-История обновлений: [CHANGELOG.md](CHANGELOG.md). Текущий статус каналов публикуется в `status.txt`.
-
-## Резервные потоки, категории и имена
-
-- **Несколько потоков на канал:** сборщик оставляет до `max_streams_per_channel` рабочих URL с одинаковым именем, категорией и номером. Нерабочие потоки в плейлист **не попадают**, но сохраняются в `state/known_streams.json` и проверяются при каждом запуске; если ссылка оживёт, канал вернётся автоматически. В OTT Navigator включите:
-  `Settings → Provider data → Channel processing → Duplicate channels → Fold duplicate channels to a single element` (**Premium**), режим объединения — `by name within one category`. После этого плеер при ошибке сам перейдёт к следующему источнику; ручной выбор — `Switch to another media source` в меню канала.
-- **Порядок:** категории задаются `group-title` и выставляются в `category_order` в `config/settings.json`; каналы нумеруются `ch-number`. В плеере выберите сортировку `order from provider playlist`, чтобы сохранить наш порядок.
-- **Названия:** берутся из справочника `iptv-org/epg` (чистые русские имена) и `iptv-org/database` (`alt_names`); точечные правки — в `name_overrides` в `config/settings.json`.
-
-## Что можно менять без риска сломать автообновление
-
-- `config/sources.txt` — добавлять/удалять публичные источники.
+- `config/sources.txt` — добавлять/удалять источники.
 - `config/settings.json`:
-  - `priority_channels` — каналы, которые надо сохранять в первую очередь;
-  - `exclude_words` — что точно не пускать в плейлист;
-  - `countries` / `country_words` — география фильтра;
-  - `parallel` и `probe_timeout_seconds` — скорость/жёсткость проверки потоков;
-  - `min_channels` — если живых каналов станет меньше, публикация **не произойдёт**, и в OTT Navigator останется предыдущая версия плейлиста.
-- `refresh_hours` — как часто плеер обновляет плейлист (1–24 часа; минимум 10 минут).
+  - `priority_channels` / `force_include_urls` — каналы и URL, которые нельзя терять;
+  - `exclude_channels` / `exclude_words` — ручное исключение;
+  - `dnr_keywords`, `cng_name_keywords`, `russian_name_keywords`, `database_category_map` — категории;
+  - `min_sources` — минимум независимых источников (сейчас 1);
+  - `parallel`, `probe_retries`, `decode_check`, `black_check`, `hls_check` — жёсткость и скорость проверки;
+  - `min_channels` — порог, ниже которого публикация отменяется.
 
-Запуск вручную: **Actions → Обновление IPTV-плейлиста → Run workflow**.
+## Проверка состояния
+
+- Плейлист: `https://DvladikD.github.io/media-cache-412/playlist.m3u`
+- Статус: `https://DvladikD.github.io/media-cache-412/status.txt`
+- Отчёт: `https://DvladikD.github.io/media-cache-412/report.json`
+- Запуски: `https://github.com/DvladikD/media-cache-412/actions`
+- История: [CHANGELOG.md](CHANGELOG.md)
 
 ## Локальная проверка (не обязательно)
 
 Нужны Python 3.11+ и `ffmpeg`:
 
 ```powershell
-python scripts/build.py
+python scripts/build.py --no-probe --epg-file .epg-cache\epg.xml.gz
 ```
 
-Проверить только логику сопоставления, без проверки потоков и без повторной загрузки EPG:
-
-```powershell
-python scripts/build.py --no-probe --epg-file E:\tmp\epg.xml.gz
-```
-
-Скрипт на выходе пишет `output/report.json` со статистикой.
+Полный прогон с проверкой потоков: `python scripts/build.py`.
 
 ## Важное
 
-- Публичные потоки нестабильны: часть каналов может быть геоблокирована или исчезнуть. Конвейер автоматически убирает мёртвые и поднимает новые из источников — но стопроцентной гарантии ни один публичный источник не даёт.
+- Публичные потоки нестабильны и могут быть геоблокированы; стопроцентной гарантии нет.
+- ByeByeDPI на GitHub runner не поможет ТВ — обход DPI нужен в домашней сети (роутер или само ТВ).
 - Репозиторий содержит только публичные ссылки, без токенов и логинов.
-- Использование публичных потоков может регулироваться правообладателями: смотрите только каналы, доступные для свободного просмотра в вашем регионе.
-- GitHub может задерживать cron в часы пика; интервал `refresh` в плеере согласован с публикацией (6 часов) — это нормально.
-
-## Проверка
-
-Плейлист: `https://DvladikD.github.io/iptv-auto/playlist.m3u`, EPG: `https://DvladikD.github.io/iptv-auto/epg.xml.gz`.
+- Просмотр — только каналов, доступных для свободного просмотра в вашем регионе.
